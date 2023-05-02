@@ -6,7 +6,194 @@
     <script src="https://code.jquery.com/jquery-3.6.4.min.js" integrity="sha256-oP6HI9z1XaZNBrJURtCoUT5SUnxFr8s3BzRl+cbzUq8=" crossorigin="anonymous"></script>
     <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/3.0.5/socket.io.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.7/tailwind.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/analogclocks/dist/clocks.min.js"></script>
 
+    <script type="text/javascript" charset="utf-8">
+    
+
+      function addData(chart, label, data1, data2, data3) {
+        chart.data.labels.push(label);
+        chart.data.datasets[0].data.push(data1);
+        if (data2 !== undefined) {
+          chart.data.datasets[1].data.push(data2);
+        }
+        if (data3 !== undefined) {
+          chart.data.datasets[2].data.push(data3);
+        }
+        chart.update();
+      }
+  
+       $(document).ready(function() {
+        namespace = '/test';
+        var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + namespace);
+  
+        socket.on('connect', function() {
+  
+          socket.on('data_loaded', function(msg) {
+            $('#log').append('All data loaded: ' + msg.data + '<br>');
+            last =  msg.data[msg.data.length-1];
+            console.log("Last element: ",  msg.data[msg.data.length-1])
+            setProps( JSON.parse(last));
+          })
+  
+          socket.emit('my_event', {data: 'I\'m connected!', value: 1}); });
+  
+          socket.on('my_response', function(msg) {
+            console.log(msg.data);
+            $('#log').append('Received: ' + msg.data + '<br>');
+  
+            if (!window.init) {
+                window.init = true;
+                const canvas = document.getElementById('myChart');
+                const canvas1 = document.getElementById('myChart1');
+                canvas.height = 100;
+                canvas1.height = 100;
+                
+                const labels = ['0'];
+  
+                const data = {
+                  labels: labels,
+                  datasets: [{
+                    label: 'AccX',
+                    backgroundColor: 'rgb(255, 99, 132)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    data: [],
+                  },{
+                    label: 'AccY',
+                    backgroundColor: 'rgb(54, 162, 235)',
+                    borderColor: 'rgb(54, 162, 235)',
+                    data: [],
+                  },{
+                    label: 'AccZ',
+                    backgroundColor: 'rgb(79, 12, 35)',
+                    borderColor: 'rgb(79, 12, 35)',
+                    data: [],
+                  }
+                
+                ]
+                };
+                const data1 = {
+                  labels: labels,
+                  datasets: [{
+                    label: 'gX',
+                    backgroundColor: 'rgb(255, 99, 132)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    data: [],
+                  },{
+                    label: 'gY',
+                    backgroundColor: 'rgb(54, 162, 235)',
+                    borderColor: 'rgb(54, 162, 235)',
+                    data: [],
+                  },{
+                    label: 'gZ',
+                    backgroundColor: 'rgb(79, 12, 35)',
+                    borderColor: 'rgb(79, 12, 35)',
+                    data: [],
+                  }
+                
+                ]
+                };
+  
+                const config = {
+                  type: 'line',
+                  data: data,
+                  options: {
+                    responsive: true,
+                    plugins: {
+                      title: {
+                        display: true
+                      }
+                    },
+                    scales: {
+                      y: {
+                        min: -30,
+                        max: 30,
+                      }
+                    }
+                  },
+                };
+                const config1 = {
+                  type: 'line',
+                  data: data1,
+                  options: {
+                    responsive: true,
+                    plugins: {
+                      title: {
+                        display: true
+                      }
+                    },
+                    scales: {
+                      y: {
+                        min: -10,
+                        max: 10,
+                      }
+                    }
+                  },
+                };
+  
+                window.myChart = new Chart(canvas, config);
+                window.myChart1 = new Chart(canvas1, config1);
+              }
+  
+            try {
+              var receivedData = JSON.parse(msg.data);
+              
+              if (!isNaN(receivedData.temp)) {
+                const aX = Math.round(receivedData.aX);
+                const aY = Math.round(receivedData.aY);
+                const aZ = Math.round(receivedData.aZ);
+                const gX = Math.round(receivedData.gX);
+                const gY = Math.round(receivedData.gY);
+                const gZ = Math.round(receivedData.gZ);       
+                addData(window.myChart, msg.count, aX, aY, aZ);
+                addData(window.myChart1, msg.count, gX, gY, gZ);
+                const tab3 = document.querySelector('#tab3');
+                const display1 = window.getComputedStyle(tab3).getPropertyValue('display');
+                if (display1 !== 'none') {
+                  setProps(receivedData);
+                  updateThermometer(receivedData.temp);
+                }      
+                const tab4 = document.querySelector('#tab4');
+                const display = window.getComputedStyle(tab4).getPropertyValue('display');
+
+                if (display !== 'none') {
+                  if(receivedData.angX && receivedData.AngY) {
+                  animate(receivedData);
+                }
+                }
+              }
+  
+            } catch (error) {
+              //console.log(error);
+            }
+          });
+      
+        $('#load-db').click(function(event) {
+            socket.emit('readDB', {value: $('#load-db').val()});
+            return false; });
+        $('#load-fl').click(function(event) {
+            socket.emit('readFile', {value: $('#load-fl').val()});
+            return false; });            
+        $('#btn-disconnect').click(function(event) {
+            socket.emit('disconnect_request');
+            return false; });
+        });
+
+        function setProps(data){
+          //console.log("DATA log: ", data)
+          var suffix = ["º", "º", "ºC"]
+          var data_values = [data.angX, data.AngY, data.temp]
+        $('.gauge').each(function(index, item) {
+          let gauge = $(item).dxCircularGauge('instance');
+          let randomNum = data_values[index];
+          let gaugeElement = $(gauge._$element[0]);
+          gaugeElement.find('.dxg-title text').last().html(`${randomNum + suffix[index]}`);
+          gauge.value(randomNum);
+        });
+      }
+     
+      </script>        
 </head>
 
 
@@ -34,10 +221,19 @@
           </ul>
       </nav>
       <main class="w-5/6 px-4 py-8">
-          <div id="tab1">
-          </div>
-          <div id="tab2" class="hidden">    
-          </div>
+        <div id="tab1">
+          <canvas id="myChart"></canvas>
+          <canvas id="myChart1"></canvas>
+        </div>
+        <div id="tab2" class="hidden">
+          <div class="container mx-auto h-screen">
+            <div class="flex h-full">
+              <div class="overflow-auto h-3/4 w-full" style="-ms-overflow-style: none">
+                <div id="log"></div>
+              </div>
+            </div>
+          </div>            
+        </div>
           <div id="tab3" class="hidden">
           </div>
           <div id="tab4" class="hidden">

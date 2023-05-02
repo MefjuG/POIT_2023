@@ -116,5 +116,49 @@ def background_thread(args, ms=''):
                     pass   
         #arduino.close()            
 
+@app.route('/')
+def index():
+    return render_template('index.html', async_mode=socketio.async_mode)
+
+@socketio.on('connect', namespace='/test')
+def test_connect():
+    global thread
+    with thread_lock:
+        if thread is None:
+            thread = socketio.start_background_task(target=background_thread, args=session._get_current_object())
+    emit('my_response', {'data': 'Connected', 'count': 0})
+
+@socketio.on('disconnect_request', namespace='/test')
+def disconnect_request():
+    session['receive_count'] = session.get('receive_count', 0) + 1
+    emit('my_response',
+         {'data': 'Disconnected!', 'count': session['receive_count']})
+    disconnect() 
+
+@socketio.on('my_event', namespace='/test')
+def test_message(message):   
+    session['receive_count'] = session.get('receive_count', 0) + 1 
+    session['A'] = message['value']    
+    emit('my_response',
+         {'data': message['value'], 'count': session['receive_count']})
+    
+
+@socketio.on('onClickEvent', namespace='/test')
+def db_message(message):
+    session['btn_value'] = message['value'] 
+    background_thread('', message['value'])
+
+@socketio.on('readFile', namespace='/test')
+def db_message(message):
+    data = readFile("output_data")
+    if data is not None:
+        socketio.emit('data_loaded', {'data':  data}, namespace='/test')
+
+@socketio.on('readDB', namespace='/test')
+def db_message(message):
+    data = readDB()
+    if data is not None:
+        socketio.emit('data_loaded', {'data': data}, namespace='/test')
+
 if __name__ == '__main__':
     socketio.run(app, host="0.0.0.0", port=80, debug=True)    
