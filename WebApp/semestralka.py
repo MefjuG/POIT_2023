@@ -68,6 +68,7 @@ def readDB():
             cursor.close()
             cnx.close()
 
+
 def saveFile(data, filename):
     try:
         with open(filename, 'a') as f:
@@ -114,7 +115,8 @@ def background_thread(args, ms=''):
                     socketio.emit('my_response', {'data': json_object[-1], 'count': count }, namespace='/test')
                 except json.JSONDecodeError:
                     pass   
-        #arduino.close()            
+        #arduino.close()
+
 
 @app.route('/')
 def index():
